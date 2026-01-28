@@ -139,13 +139,17 @@ class InstallerController extends Controller
             // Step 2: Generate APP_KEY if not set
             $this->generateAppKey();
 
-            // Step 3: Update .env file with provided values
+            // Step 3: Set DB_CONNECTION to mysql immediately to prevent SQLite errors
+            $this->updateEnv([
+                'DB_CONNECTION' => 'mysql',
+            ]);
+
+            // Step 4: Update .env file with provided values
             $this->updateEnv([
                 'APP_NAME' => '"' . addslashes($request->app_name) . '"',
                 'APP_ENV' => 'production',
                 'APP_DEBUG' => 'false',
                 'APP_URL' => $request->app_url,
-                'DB_CONNECTION' => 'mysql',
                 'DB_HOST' => $request->db_host,
                 'DB_PORT' => $request->db_port,
                 'DB_DATABASE' => $request->db_database,
@@ -153,7 +157,7 @@ class InstallerController extends Controller
                 'DB_PASSWORD' => $request->db_password ?? '',
             ]);
 
-            // Step 4: Test database connection (database doesn't need to exist, just connection)
+            // Step 5: Test database connection (database doesn't need to exist, just connection)
             config([
                 'database.connections.mysql.host' => $request->db_host,
                 'database.connections.mysql.port' => $request->db_port,
@@ -177,7 +181,7 @@ class InstallerController extends Controller
                 }
             }
 
-            // Step 5: Clear config cache
+            // Step 6: Clear config cache and reload database config
             if (file_exists(base_path('bootstrap/cache/config.php'))) {
                 unlink(base_path('bootstrap/cache/config.php'));
             }
@@ -301,7 +305,7 @@ class InstallerController extends Controller
             // Copy from .env.example
             copy($envExample, $envFile);
         } else {
-            // Create basic .env file
+            // Create basic .env file with blank MySQL settings
             $defaultEnv = "APP_NAME=Laravel
 APP_ENV=local
 APP_KEY=
@@ -317,7 +321,7 @@ LOG_CHANNEL=stack
 LOG_LEVEL=debug
 
 DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
+DB_HOST=
 DB_PORT=3306
 DB_DATABASE=
 DB_USERNAME=
@@ -330,6 +334,17 @@ CACHE_STORE=database
 SESSION_DRIVER=database
 ";
             file_put_contents($envFile, $defaultEnv);
+        }
+        
+        // Ensure DB_CONNECTION is set to mysql (not sqlite)
+        $envContent = file_get_contents($envFile);
+        if (preg_match('/^DB_CONNECTION=sqlite/m', $envContent)) {
+            $envContent = preg_replace('/^DB_CONNECTION=sqlite/m', 'DB_CONNECTION=mysql', $envContent);
+            file_put_contents($envFile, $envContent);
+        } elseif (!preg_match('/^DB_CONNECTION=/m', $envContent)) {
+            // Add DB_CONNECTION if missing
+            $envContent = "DB_CONNECTION=mysql\n" . $envContent;
+            file_put_contents($envFile, $envContent);
         }
     }
 
