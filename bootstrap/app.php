@@ -4,6 +4,13 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
+// Prevent SQLite from being used - force MySQL before app boots
+if (env('DB_CONNECTION') === 'sqlite' || (empty(env('DB_CONNECTION')) && !file_exists(storage_path('installed')))) {
+    // If SQLite detected or app not installed, set MySQL as default
+    $_ENV['DB_CONNECTION'] = 'mysql';
+    putenv('DB_CONNECTION=mysql');
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',

@@ -24,9 +24,18 @@ class AppServiceProvider extends ServiceProvider
             config(['database.default' => 'mysql']);
         }
         
-        // Ensure session connection uses MySQL
-        if (config('session.driver') === 'database' && !config('session.connection')) {
-            config(['session.connection' => 'mysql']);
+        // If app is not installed, use file sessions to avoid database errors
+        $installed = file_exists(storage_path('installed'));
+        if (!$installed && config('session.driver') === 'database') {
+            config(['session.driver' => 'file']);
+        }
+        
+        // Ensure session connection uses MySQL if using database driver
+        if (config('session.driver') === 'database') {
+            $sessionConnection = config('session.connection');
+            if (!$sessionConnection || $sessionConnection === 'sqlite') {
+                config(['session.connection' => 'mysql']);
+            }
         }
     }
 }

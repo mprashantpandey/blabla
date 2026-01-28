@@ -18,7 +18,10 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'database'),
+    // Use file driver if app not installed or SQLite detected (prevents SQLite errors)
+    'driver' => (!file_exists(storage_path('installed')) || env('DB_CONNECTION') === 'sqlite') 
+        ? 'file' 
+        : env('SESSION_DRIVER', 'database'),
 
     /*
     |--------------------------------------------------------------------------
