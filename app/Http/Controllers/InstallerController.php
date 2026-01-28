@@ -182,17 +182,28 @@ class InstallerController extends Controller
                 unlink(base_path('bootstrap/cache/config.php'));
             }
 
-            // Step 6: Run migrations (with force flag and handle existing tables)
+            // Step 6: Run migrations
+            // For fresh installation, use migrate:fresh to ensure clean state
+            // This drops all tables and recreates them (safe for fresh install)
             try {
-                Artisan::call('migrate', ['--force' => true]);
-            } catch (\Exception $e) {
-                // If migration fails due to existing tables, try fresh migration
-                // This handles cases where database was partially migrated
-                if (str_contains($e->getMessage(), 'already exists')) {
-                    // For fresh installation, drop and recreate
+                // Check if any tables exist
+                $tables = DB::select("SHOW TABLES");
+                $tableCount = count($tables);
+                
+                if ($tableCount > 0) {
+                    // Tables exist, use fresh migration for clean install
                     Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
                 } else {
-                    throw $e;
+                    // No tables, safe to run normal migration
+                    Artisan::call('migrate', ['--force' => true]);
+                }
+            } catch (\Exception $e) {
+                // If SHOW TABLES fails or migration fails, try fresh migration
+                // This ensures clean state for fresh installation
+                try {
+                    Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
+                } catch (\Exception $freshError) {
+                    throw new \Exception('Migration failed: ' . $freshError->getMessage());
                 }
             }
 
