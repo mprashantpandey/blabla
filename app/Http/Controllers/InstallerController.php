@@ -186,9 +186,26 @@ class InstallerController extends Controller
             // For fresh installation, use migrate:fresh to ensure clean state
             // This drops all tables and recreates them (safe for fresh install)
             try {
-                // Check if any tables exist
-                $tables = DB::select("SHOW TABLES");
-                $tableCount = count($tables);
+                // Check if any tables exist (database-agnostic)
+                $driver = config('database.default');
+                $tableCount = 0;
+                
+                try {
+                    if ($driver === 'mysql') {
+                        $tables = DB::select("SHOW TABLES");
+                        $tableCount = count($tables);
+                    } elseif ($driver === 'sqlite') {
+                        $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+                        $tableCount = count($tables);
+                    } else {
+                        // For other databases, try to get tables
+                        $tables = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()");
+                        $tableCount = count($tables);
+                    }
+                } catch (\Exception $e) {
+                    // If we can't check, assume no tables and proceed with normal migrate
+                    $tableCount = 0;
+                }
                 
                 if ($tableCount > 0) {
                     // Tables exist, use fresh migration for clean install
@@ -198,12 +215,16 @@ class InstallerController extends Controller
                     Artisan::call('migrate', ['--force' => true]);
                 }
             } catch (\Exception $e) {
-                // If SHOW TABLES fails or migration fails, try fresh migration
+                // If migration fails, try fresh migration as fallback
                 // This ensures clean state for fresh installation
-                try {
-                    Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
-                } catch (\Exception $freshError) {
-                    throw new \Exception('Migration failed: ' . $freshError->getMessage());
+                if (str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'table') && str_contains($e->getMessage(), 'exist')) {
+                    try {
+                        Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
+                    } catch (\Exception $freshError) {
+                        throw new \Exception('Migration failed: ' . $freshError->getMessage());
+                    }
+                } else {
+                    throw $e;
                 }
             }
 
