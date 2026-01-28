@@ -9,6 +9,8 @@
 .env
 .env.backup
 .env.production
+# Keep .env.example in repository
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 Homestead.json
