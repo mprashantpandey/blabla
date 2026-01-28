@@ -22,7 +22,7 @@ return new class extends Migration
                 $table->index('ride_id');
                 $table->index('rider_user_id');
                 $table->index('driver_user_id');
-                $table->index('status');
+                // status index already created on column definition (line 18)
             });
         }
     }
