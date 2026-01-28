@@ -10,8 +10,10 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 
-class User extends Authenticatable implements HasMedia
+class User extends Authenticatable implements HasMedia, FilamentUser
 {
     use HasFactory, Notifiable, HasApiTokens, HasRoles, SoftDeletes, InteractsWithMedia;
 
@@ -185,5 +187,14 @@ class User extends Authenticatable implements HasMedia
     public function supportTickets()
     {
         return $this->hasMany(SupportTicket::class);
+    }
+
+    /**
+     * Determine if the user can access the Filament admin panel.
+     */
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // Allow access if user has any admin role
+        return $this->hasAnyRole(['super_admin', 'city_admin', 'support_staff']) && $this->is_active;
     }
 }
