@@ -140,14 +140,9 @@ class InstallerController extends Controller
             $this->generateAppKey();
 
             // Step 3: Set DB_CONNECTION to mysql immediately to prevent SQLite errors
-            // This must be done BEFORE any database operations to avoid SQLite errors
             $this->updateEnv([
                 'DB_CONNECTION' => 'mysql',
             ]);
-            
-            // Force reload config immediately to use MySQL (prevents SQLite errors)
-            config(['database.default' => 'mysql']);
-            DB::purge(); // Clear any cached connections
 
             // Step 4: Update .env file with provided values
             $this->updateEnv([
@@ -190,6 +185,10 @@ class InstallerController extends Controller
             if (file_exists(base_path('bootstrap/cache/config.php'))) {
                 unlink(base_path('bootstrap/cache/config.php'));
             }
+            
+            // Force MySQL as default connection (prevent SQLite errors)
+            config(['database.default' => 'mysql']);
+            DB::setDefaultConnection('mysql');
 
             // Step 7: Run migrations
             // Force MySQL connection (prevent SQLite errors)
