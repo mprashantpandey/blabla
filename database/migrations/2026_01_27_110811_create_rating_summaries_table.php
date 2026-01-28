@@ -18,7 +18,6 @@ return new class extends Migration
             $table->timestamp('updated_at');
 
             $table->unique(['user_id', 'role']);
-            $table->index('avg_rating');
         });
     }
 

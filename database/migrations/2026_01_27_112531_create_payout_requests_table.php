@@ -21,7 +21,6 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index('driver_profile_id');
-            $table->index('status');
             $table->index('requested_at');
         });
     }

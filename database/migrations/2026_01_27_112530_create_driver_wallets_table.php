@@ -16,8 +16,6 @@ return new class extends Migration
             $table->decimal('lifetime_withdrawn', 12, 2)->default(0);
             $table->timestamp('last_updated_at')->nullable();
             $table->timestamps();
-
-            $table->index('balance');
         });
     }
 

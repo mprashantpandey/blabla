@@ -20,7 +20,6 @@ return new class extends Migration
             $table->text('admin_note')->nullable();
             $table->timestamp('created_at');
 
-            $table->index('status');
             $table->index('reported_user_id');
             $table->index('reporter_user_id');
         });

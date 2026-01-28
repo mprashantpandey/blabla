@@ -26,7 +26,6 @@ return new class extends Migration
 
             $table->index('driver_wallet_id');
             $table->index('booking_id');
-            $table->index('type');
             $table->index('created_at');
         });
         

@@ -27,7 +27,6 @@ return new class extends Migration
 
             $table->unique(['booking_id', 'rater_user_id', 'role']);
             $table->index('ratee_user_id');
-            $table->index('rating');
         });
         
         // Add foreign key constraints after table is created
