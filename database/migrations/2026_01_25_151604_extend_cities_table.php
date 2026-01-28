@@ -36,7 +36,14 @@ return new class extends Migration
             
             // Add default_search_radius_km
             if (!Schema::hasColumn('cities', 'default_search_radius_km')) {
-                $table->decimal('default_search_radius_km', 8, 2)->default(30.00)->after('radius');
+                // Add after timezone if it exists, otherwise after sort_order, or just add without after clause
+                if (Schema::hasColumn('cities', 'timezone')) {
+                    $table->decimal('default_search_radius_km', 8, 2)->default(30.00)->after('timezone');
+                } elseif (Schema::hasColumn('cities', 'sort_order')) {
+                    $table->decimal('default_search_radius_km', 8, 2)->default(30.00)->after('sort_order');
+                } else {
+                    $table->decimal('default_search_radius_km', 8, 2)->default(30.00);
+                }
             }
             
             // Add created_by
