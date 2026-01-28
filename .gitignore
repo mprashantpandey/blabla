@@ -5,8 +5,8 @@
 /public/storage
 /storage/*.key
 /storage/pail
-/vendor
-.env
+# /vendor - INCLUDED for easier deployment
+# .env - INCLUDED (remove sensitive data before committing)
 .env.backup
 .env.production
 # Keep .env.example in repository
