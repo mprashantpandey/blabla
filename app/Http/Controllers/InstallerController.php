@@ -258,6 +258,13 @@ class InstallerController extends Controller
                 // Storage link may already exist, continue
             }
 
+            // Step 11b: Publish Filament assets
+            try {
+                Artisan::call('filament:assets');
+            } catch (\Exception $e) {
+                // Assets may already be published, continue
+            }
+
             // Step 12: Clear all caches
             Artisan::call('config:clear');
             Artisan::call('cache:clear');
@@ -275,6 +282,7 @@ class InstallerController extends Controller
                     'cities_seeded' => City::count() > 0,
                     'settings_initialized' => SystemSetting::count() > 0,
                     'storage_linked' => file_exists(public_path('storage')),
+                    'assets_published' => file_exists(public_path('js/filament')) || file_exists(public_path('css/filament')),
                     'cron_reminder' => 'Add cron job: * * * * * cd ' . base_path() . ' && php artisan schedule:run >> /dev/null 2>&1',
                 ],
             ]);

@@ -24,7 +24,22 @@
     RewriteCond %{HTTP:x-xsrf-token} .
     RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
 
-    # Allow access to public directory assets (must be before front controller)
+    # Serve static assets directly from public directory (must be before front controller)
+    # Check if file exists in public/ directory and serve it
+    RewriteCond %{REQUEST_URI} !^/index\.php
+    RewriteCond %{REQUEST_URI} !^/public/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Explicitly handle Filament asset paths
+    RewriteCond %{REQUEST_URI} ^/(js|css|build)/
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{DOCUMENT_ROOT}/public%{REQUEST_URI} -f
+    RewriteRule ^(.*)$ public/$1 [L]
+
+    # Allow direct access to public directory assets
     RewriteCond %{REQUEST_URI} ^/public/
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^public/(.*)$ public/$1 [L]
@@ -225,9 +240,38 @@ Options -Indexes
 </FilesMatch>
 
 # ============================================
+# MIME TYPES
+# ============================================
+<IfModule mod_mime.c>
+    # JavaScript
+    AddType application/javascript .js
+    AddType text/javascript .js
+    
+    # CSS
+    AddType text/css .css
+    
+    # Images
+    AddType image/jpeg .jpg .jpeg
+    AddType image/png .png
+    AddType image/gif .gif
+    AddType image/svg+xml .svg
+    AddType image/x-icon .ico
+    AddType image/webp .webp
+    
+    # Fonts
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType application/font-woff .woff
+    AddType application/font-woff2 .woff2
+    AddType font/ttf .ttf
+    AddType font/otf .otf
+    AddType application/vnd.ms-fontobject .eot
+    
+    # UTF-8 Encoding
+    AddCharset UTF-8 .html .css .js .xml .json .rss .atom
+</IfModule>
+
+# ============================================
 # UTF-8 ENCODING
 # ============================================
 AddDefaultCharset UTF-8
-<IfModule mod_mime.c>
-    AddCharset UTF-8 .html .css .js .xml .json .rss .atom
-</IfModule>
