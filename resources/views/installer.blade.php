@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    @if(function_exists('csrf_token'))
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @endif
     <title>Install BlaBla - Setup Wizard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -109,11 +111,14 @@
 
                     <!-- Submit Button -->
                     <div class="flex justify-end">
-                        <button type="submit" id="installButton"
-                            class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span id="installButtonText">Install Application</span>
-                            <span id="installButtonSpinner" class="hidden">Installing...</span>
-                        </button>
+                    <button type="submit" id="installButton"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span id="installButtonText">Install Application</span>
+                        <span id="installButtonSpinner" class="hidden">
+                            <span class="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                            Installing...
+                        </span>
+                    </button>
                     </div>
                 </form>
             </div>
@@ -239,12 +244,19 @@
             document.getElementById('successMessage').style.display = 'none';
 
             try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                };
+                
+                // Add CSRF token if available (may not be available in fresh install)
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+                if (csrfToken) {
+                    headers['X-CSRF-TOKEN'] = csrfToken;
+                }
+                
                 const response = await fetch('/install/run', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
-                    },
+                    headers: headers,
                     body: JSON.stringify(data)
                 });
 
@@ -270,6 +282,10 @@
                 installButton.disabled = false;
                 installButtonText.classList.remove('hidden');
                 installButtonSpinner.classList.add('hidden');
+                const progressMsg = document.getElementById('progressMessage');
+                if (progressMsg) {
+                    progressMsg.remove();
+                }
             }
         });
 

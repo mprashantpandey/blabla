@@ -25,8 +25,8 @@ Route::get('/install', function () {
     return view('installer');
 });
 
-// Installer API routes
-Route::prefix('install')->group(function () {
+// Installer API routes (excluded from CSRF for fresh installation)
+Route::prefix('install')->withoutMiddleware(['web'])->group(function () {
     Route::get('/check', [InstallerController::class, 'check']);
     Route::post('/run', [InstallerController::class, 'install']);
 });

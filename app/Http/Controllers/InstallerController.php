@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\File;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -85,12 +85,22 @@ class InstallerController extends Controller
             'status' => ($storageWritable && $bootstrapCacheWritable) ? 'pass' : 'fail',
         ];
 
-        // .env Writable
-        $envWritable = is_writable(base_path('.env')) || (file_exists(base_path('.env.example')) && is_writable(base_path()));
+        // .env File Status
+        $envExists = file_exists(base_path('.env'));
+        $envExampleExists = file_exists(base_path('.env.example'));
+        $envWritable = $envExists ? is_writable(base_path('.env')) : is_writable(base_path());
+        
         $checks['env'] = [
             'name' => '.env File',
+            'exists' => $envExists,
+            'example_exists' => $envExampleExists,
             'writable' => $envWritable,
             'status' => $envWritable ? 'pass' : 'fail',
+            'message' => $envExists 
+                ? '.env file exists and is writable' 
+                : ($envExampleExists 
+                    ? '.env file will be created from .env.example' 
+                    : '.env.example not found, will create new .env'),
         ];
 
         return $checks;
@@ -101,6 +111,14 @@ class InstallerController extends Controller
      */
     public function install(Request $request)
     {
+        // Prevent re-installation
+        if (file_exists(storage_path('installed'))) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Application is already installed.',
+            ], 403);
+        }
+
         $request->validate([
             'db_host' => 'required|string',
             'db_port' => 'required|integer',
@@ -115,18 +133,27 @@ class InstallerController extends Controller
         ]);
 
         try {
-            // Update .env file
+            // Step 1: Create .env file if it doesn't exist
+            $this->createEnvFile();
+
+            // Step 2: Generate APP_KEY if not set
+            $this->generateAppKey();
+
+            // Step 3: Update .env file with provided values
             $this->updateEnv([
+                'APP_NAME' => '"' . addslashes($request->app_name) . '"',
+                'APP_ENV' => 'production',
+                'APP_DEBUG' => 'false',
+                'APP_URL' => $request->app_url,
+                'DB_CONNECTION' => 'mysql',
                 'DB_HOST' => $request->db_host,
                 'DB_PORT' => $request->db_port,
                 'DB_DATABASE' => $request->db_database,
                 'DB_USERNAME' => $request->db_username,
                 'DB_PASSWORD' => $request->db_password ?? '',
-                'APP_NAME' => $request->app_name,
-                'APP_URL' => $request->app_url,
             ]);
 
-            // Test database connection
+            // Step 4: Test database connection (database doesn't need to exist, just connection)
             config([
                 'database.connections.mysql.host' => $request->db_host,
                 'database.connections.mysql.port' => $request->db_port,
@@ -135,15 +162,33 @@ class InstallerController extends Controller
                 'database.connections.mysql.password' => $request->db_password ?? '',
             ]);
 
-            DB::connection('mysql')->getPdo();
+            // Test connection
+            try {
+                DB::connection('mysql')->getPdo();
+            } catch (\Exception $e) {
+                // Try to create database if it doesn't exist
+                try {
+                    $this->createDatabaseIfNotExists($request);
+                } catch (\Exception $createError) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Database connection failed. Please ensure the database exists or the user has permission to create databases. Error: ' . $e->getMessage(),
+                    ], 500);
+                }
+            }
 
-            // Run migrations
+            // Step 5: Clear config cache
+            if (file_exists(base_path('bootstrap/cache/config.php'))) {
+                unlink(base_path('bootstrap/cache/config.php'));
+            }
+
+            // Step 6: Run migrations
             Artisan::call('migrate', ['--force' => true]);
 
-            // Create roles and permissions
+            // Step 7: Create roles and permissions
             $this->createRolesAndPermissions();
 
-            // Create admin user
+            // Step 8: Create admin user
             $admin = User::create([
                 'name' => $request->admin_name,
                 'email' => $request->admin_email,
@@ -154,20 +199,26 @@ class InstallerController extends Controller
 
             $admin->assignRole('super_admin');
 
-            // Create default settings
+            // Step 9: Create default settings
             $this->createDefaultSettings($request->app_name);
 
-            // Create default cities
+            // Step 10: Create default cities
             $this->createDefaultCities();
 
-            // Create storage link
+            // Step 11: Create storage link
             try {
                 Artisan::call('storage:link', ['--force' => true]);
             } catch (\Exception $e) {
                 // Storage link may already exist, continue
             }
 
-            // Mark as installed
+            // Step 12: Clear all caches
+            Artisan::call('config:clear');
+            Artisan::call('cache:clear');
+            Artisan::call('route:clear');
+            Artisan::call('view:clear');
+
+            // Step 13: Mark as installed
             file_put_contents(storage_path('installed'), now()->toDateTimeString());
 
             return response()->json([
@@ -185,20 +236,110 @@ class InstallerController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Installation failed: ' . $e->getMessage(),
+                'trace' => config('app.debug') ? $e->getTraceAsString() : null,
             ], 500);
         }
     }
 
     /**
-     * Check database connection.
+     * Create .env file from .env.example if it doesn't exist.
      */
-    private function checkDatabase(): bool
+    private function createEnvFile(): void
     {
+        $envFile = base_path('.env');
+        
+        if (file_exists($envFile)) {
+            return; // .env already exists
+        }
+
+        $envExample = base_path('.env.example');
+        
+        if (file_exists($envExample)) {
+            // Copy from .env.example
+            copy($envExample, $envFile);
+        } else {
+            // Create basic .env file
+            $defaultEnv = "APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_TIMEZONE=UTC
+APP_URL=http://localhost
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=
+DB_USERNAME=
+DB_PASSWORD=
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=database
+CACHE_STORE=database
+SESSION_DRIVER=database
+";
+            file_put_contents($envFile, $defaultEnv);
+        }
+    }
+
+    /**
+     * Generate APP_KEY if not set.
+     */
+    private function generateAppKey(): void
+    {
+        $envFile = base_path('.env');
+        $envContent = file_get_contents($envFile);
+
+        // Check if APP_KEY is empty or not set
+        if (!preg_match('/^APP_KEY=(.+)$/m', $envContent) || preg_match('/^APP_KEY=$/m', $envContent)) {
+            // Generate key manually (works without database)
+            $key = 'base64:' . base64_encode(random_bytes(32));
+            
+            // Update .env file with generated key
+            if (preg_match('/^APP_KEY=.*$/m', $envContent)) {
+                $envContent = preg_replace('/^APP_KEY=.*$/m', "APP_KEY={$key}", $envContent);
+            } else {
+                $envContent = "APP_KEY={$key}\n" . $envContent;
+            }
+            
+            file_put_contents($envFile, $envContent);
+        }
+    }
+
+    /**
+     * Try to create database if it doesn't exist.
+     */
+    private function createDatabaseIfNotExists(Request $request): void
+    {
+        // Connect without database name
+        config([
+            'database.connections.mysql.host' => $request->db_host,
+            'database.connections.mysql.port' => $request->db_port,
+            'database.connections.mysql.database' => null,
+            'database.connections.mysql.username' => $request->db_username,
+            'database.connections.mysql.password' => $request->db_password ?? '',
+        ]);
+
         try {
+            $pdo = DB::connection('mysql')->getPdo();
+            $pdo->exec("CREATE DATABASE IF NOT EXISTS `{$request->db_database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+            
+            // Reconnect with database
+            config([
+                'database.connections.mysql.database' => $request->db_database,
+            ]);
+            DB::purge('mysql');
             DB::connection('mysql')->getPdo();
-            return true;
         } catch (\Exception $e) {
-            return false;
+            throw new \Exception('Cannot create database. Please create it manually or ensure the user has CREATE privileges. Error: ' . $e->getMessage());
         }
     }
 
