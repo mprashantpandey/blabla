@@ -19,6 +19,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Prevent SQLite from being used - force MySQL
+        if (config('database.default') === 'sqlite') {
+            config(['database.default' => 'mysql']);
+        }
+        
+        // Ensure session connection uses MySQL
+        if (config('session.driver') === 'database' && !config('session.connection')) {
+            config(['session.connection' => 'mysql']);
+        }
     }
 }

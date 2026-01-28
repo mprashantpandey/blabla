@@ -142,6 +142,7 @@ class InstallerController extends Controller
             // Step 3: Set DB_CONNECTION to mysql immediately to prevent SQLite errors
             $this->updateEnv([
                 'DB_CONNECTION' => 'mysql',
+                'SESSION_CONNECTION' => 'mysql', // Ensure sessions use MySQL too
             ]);
 
             // Step 4: Update .env file with provided values
@@ -336,12 +337,32 @@ SESSION_DRIVER=database
         
         // Ensure DB_CONNECTION is set to mysql (not sqlite)
         $envContent = file_get_contents($envFile);
+        $updated = false;
+        
         if (preg_match('/^DB_CONNECTION=sqlite/m', $envContent)) {
             $envContent = preg_replace('/^DB_CONNECTION=sqlite/m', 'DB_CONNECTION=mysql', $envContent);
-            file_put_contents($envFile, $envContent);
+            $updated = true;
         } elseif (!preg_match('/^DB_CONNECTION=/m', $envContent)) {
             // Add DB_CONNECTION if missing
             $envContent = "DB_CONNECTION=mysql\n" . $envContent;
+            $updated = true;
+        }
+        
+        // Ensure SESSION_CONNECTION is set to mysql
+        if (!preg_match('/^SESSION_CONNECTION=/m', $envContent)) {
+            // Add SESSION_CONNECTION if missing
+            if (preg_match('/^SESSION_DRIVER=/m', $envContent)) {
+                $envContent = preg_replace('/^(SESSION_DRIVER=.*)$/m', "$1\nSESSION_CONNECTION=mysql", $envContent);
+            } else {
+                $envContent .= "\nSESSION_CONNECTION=mysql";
+            }
+            $updated = true;
+        } elseif (preg_match('/^SESSION_CONNECTION=sqlite/m', $envContent)) {
+            $envContent = preg_replace('/^SESSION_CONNECTION=sqlite/m', 'SESSION_CONNECTION=mysql', $envContent);
+            $updated = true;
+        }
+        
+        if ($updated) {
             file_put_contents($envFile, $envContent);
         }
     }
