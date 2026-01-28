@@ -331,6 +331,7 @@ FILESYSTEM_DISK=local
 QUEUE_CONNECTION=database
 CACHE_STORE=database
 SESSION_DRIVER=database
+SESSION_CONNECTION=mysql
 ";
             file_put_contents($envFile, $defaultEnv);
         }
