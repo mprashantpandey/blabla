@@ -19,9 +19,14 @@ return [
     */
 
     // Use file driver if app not installed or SQLite detected (prevents SQLite errors)
-    'driver' => (!file_exists(storage_path('installed')) || env('DB_CONNECTION') === 'sqlite') 
-        ? 'file' 
-        : env('SESSION_DRIVER', 'database'),
+    // Use direct path check since storage_path() may not be available during config loading
+    'driver' => (function() {
+        $basePath = dirname(__DIR__);
+        $installedFile = $basePath . '/storage/installed';
+        $notInstalled = !file_exists($installedFile);
+        $isSqlite = env('DB_CONNECTION') === 'sqlite';
+        return ($notInstalled || $isSqlite) ? 'file' : env('SESSION_DRIVER', 'database');
+    })(),
 
     /*
     |--------------------------------------------------------------------------
