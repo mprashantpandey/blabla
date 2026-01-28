@@ -242,6 +242,14 @@
             
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successMessage').style.display = 'none';
+            
+            // Show progress message
+            const progressMsg = document.createElement('div');
+            progressMsg.id = 'progressMessage';
+            progressMsg.className = 'bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4';
+            progressMsg.innerHTML = '<div class="flex items-center gap-2"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div><span>Setting up application... This may take a minute.</span></div>';
+            const formElement = document.getElementById('installFormElement');
+            formElement.parentNode.insertBefore(progressMsg, formElement);
 
             try {
                 const headers = {
