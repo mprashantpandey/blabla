@@ -5,7 +5,10 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
 // Prevent SQLite from being used - force MySQL before app boots
-if (env('DB_CONNECTION') === 'sqlite' || (empty(env('DB_CONNECTION')) && !file_exists(storage_path('installed')))) {
+// Use direct path instead of storage_path() helper (not available yet)
+$basePath = dirname(__DIR__);
+$installedFile = $basePath . '/storage/installed';
+if (env('DB_CONNECTION') === 'sqlite' || (empty(env('DB_CONNECTION')) && !file_exists($installedFile))) {
     // If SQLite detected or app not installed, set MySQL as default
     $_ENV['DB_CONNECTION'] = 'mysql';
     putenv('DB_CONNECTION=mysql');
