@@ -182,8 +182,19 @@ class InstallerController extends Controller
                 unlink(base_path('bootstrap/cache/config.php'));
             }
 
-            // Step 6: Run migrations
-            Artisan::call('migrate', ['--force' => true]);
+            // Step 6: Run migrations (with force flag and handle existing tables)
+            try {
+                Artisan::call('migrate', ['--force' => true]);
+            } catch (\Exception $e) {
+                // If migration fails due to existing tables, try fresh migration
+                // This handles cases where database was partially migrated
+                if (str_contains($e->getMessage(), 'already exists')) {
+                    // For fresh installation, drop and recreate
+                    Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
+                } else {
+                    throw $e;
+                }
+            }
 
             // Step 7: Create roles and permissions
             $this->createRolesAndPermissions();
