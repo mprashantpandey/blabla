@@ -8,10 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Ensure conversations and users tables exist
+        if (!Schema::hasTable('conversations') || !Schema::hasTable('users')) {
+            return;
+        }
+
         Schema::create('messages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('conversation_id')->constrained()->onDelete('cascade');
-            $table->foreignId('sender_user_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->unsignedBigInteger('conversation_id');
+            $table->unsignedBigInteger('sender_user_id')->nullable();
             $table->enum('message_type', ['text', 'system'])->default('text')->index();
             $table->text('body');
             $table->json('meta')->nullable();
@@ -21,6 +26,19 @@ return new class extends Migration
             $table->index('conversation_id');
             $table->index('sender_user_id');
             $table->index('created_at');
+        });
+        
+        // Add foreign key constraints after table is created
+        Schema::table('messages', function (Blueprint $table) {
+            $table->foreign('conversation_id')
+                  ->references('id')
+                  ->on('conversations')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('sender_user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('set null');
         });
     }
 

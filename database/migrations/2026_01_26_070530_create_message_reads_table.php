@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         // Ensure messages and users tables exist before creating foreign keys
-        if (!Schema::hasTable('messages')) {
-            // If messages table doesn't exist, skip this migration
+        if (!Schema::hasTable('messages') || !Schema::hasTable('users')) {
+            // If referenced tables don't exist, skip this migration
             return;
         }
 
@@ -22,23 +22,22 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id');
             $table->timestamp('read_at');
 
-            // Add foreign key constraints after table is created
+            $table->unique(['message_id', 'user_id']);
+            $table->index('user_id');
+            $table->index('read_at');
+        });
+        
+        // Add foreign key constraints after table is created
+        Schema::table('message_reads', function (Blueprint $table) {
             $table->foreign('message_id')
                   ->references('id')
                   ->on('messages')
                   ->onDelete('cascade');
                   
-            // Only add user foreign key if users table exists
-            if (Schema::hasTable('users')) {
-                $table->foreign('user_id')
-                      ->references('id')
-                      ->on('users')
-                      ->onDelete('cascade');
-            }
-
-            $table->unique(['message_id', 'user_id']);
-            $table->index('user_id');
-            $table->index('read_at');
+            $table->foreign('user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('cascade');
         });
     }
 
