@@ -186,26 +186,20 @@ class InstallerController extends Controller
                 unlink(base_path('bootstrap/cache/config.php'));
             }
 
-            // Step 6: Run migrations
+            // Step 7: Run migrations
+            // Force MySQL connection (prevent SQLite errors)
+            DB::setDefaultConnection('mysql');
+            config(['database.default' => 'mysql']);
+            
             // For fresh installation, use migrate:fresh to ensure clean state
             // This drops all tables and recreates them (safe for fresh install)
             try {
-                // Check if any tables exist (database-agnostic)
-                $driver = config('database.default');
+                // Check if any tables exist (MySQL only)
                 $tableCount = 0;
                 
                 try {
-                    if ($driver === 'mysql') {
-                        $tables = DB::select("SHOW TABLES");
-                        $tableCount = count($tables);
-                    } elseif ($driver === 'sqlite') {
-                        $tables = DB::select("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-                        $tableCount = count($tables);
-                    } else {
-                        // For other databases, try to get tables
-                        $tables = DB::select("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE()");
-                        $tableCount = count($tables);
-                    }
+                    $tables = DB::connection('mysql')->select("SHOW TABLES");
+                    $tableCount = count($tables);
                 } catch (\Exception $e) {
                     // If we can't check, assume no tables and proceed with normal migrate
                     $tableCount = 0;
@@ -213,17 +207,17 @@ class InstallerController extends Controller
                 
                 if ($tableCount > 0) {
                     // Tables exist, use fresh migration for clean install
-                    Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
+                    Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false, '--database' => 'mysql']);
                 } else {
                     // No tables, safe to run normal migration
-                    Artisan::call('migrate', ['--force' => true]);
+                    Artisan::call('migrate', ['--force' => true, '--database' => 'mysql']);
                 }
             } catch (\Exception $e) {
                 // If migration fails, try fresh migration as fallback
                 // This ensures clean state for fresh installation
-                if (str_contains($e->getMessage(), 'already exists') || str_contains($e->getMessage(), 'table') && str_contains($e->getMessage(), 'exist')) {
+                if (str_contains($e->getMessage(), 'already exists') || (str_contains($e->getMessage(), 'table') && str_contains($e->getMessage(), 'exist'))) {
                     try {
-                        Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false]);
+                        Artisan::call('migrate:fresh', ['--force' => true, '--seed' => false, '--database' => 'mysql']);
                     } catch (\Exception $freshError) {
                         throw new \Exception('Migration failed: ' . $freshError->getMessage());
                     }
