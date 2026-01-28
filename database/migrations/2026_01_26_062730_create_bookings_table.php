@@ -8,12 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Ensure referenced tables exist
+        if (!Schema::hasTable('rides') || !Schema::hasTable('users') || !Schema::hasTable('driver_profiles') || !Schema::hasTable('cities')) {
+            return;
+        }
+
         Schema::create('bookings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('ride_id')->constrained()->onDelete('cascade');
-            $table->foreignId('rider_user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('driver_profile_id')->constrained()->onDelete('cascade');
-            $table->foreignId('city_id')->constrained()->onDelete('cascade');
+            $table->unsignedBigInteger('ride_id');
+            $table->unsignedBigInteger('rider_user_id');
+            $table->unsignedBigInteger('driver_profile_id');
+            $table->unsignedBigInteger('city_id');
             $table->enum('status', [
                 'requested',
                 'accepted',
@@ -51,6 +56,29 @@ return new class extends Migration
             $table->index('status');
             $table->index('hold_expires_at');
             $table->index('payment_status');
+        });
+        
+        // Add foreign key constraints after table is created
+        Schema::table('bookings', function (Blueprint $table) {
+            $table->foreign('ride_id')
+                  ->references('id')
+                  ->on('rides')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('rider_user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('driver_profile_id')
+                  ->references('id')
+                  ->on('driver_profiles')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('city_id')
+                  ->references('id')
+                  ->on('cities')
+                  ->onDelete('cascade');
         });
     }
 

@@ -8,12 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Ensure referenced tables exist
+        if (!Schema::hasTable('bookings') || !Schema::hasTable('rides') || !Schema::hasTable('users')) {
+            return;
+        }
+
         Schema::create('ratings', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('booking_id')->constrained()->onDelete('cascade');
-            $table->foreignId('ride_id')->constrained()->onDelete('cascade');
-            $table->foreignId('rater_user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('ratee_user_id')->constrained('users')->onDelete('cascade');
+            $table->unsignedBigInteger('booking_id');
+            $table->unsignedBigInteger('ride_id');
+            $table->unsignedBigInteger('rater_user_id');
+            $table->unsignedBigInteger('ratee_user_id');
             $table->enum('role', ['rider_to_driver', 'driver_to_rider'])->index();
             $table->tinyInteger('rating')->unsigned()->index(); // 1-5
             $table->text('comment')->nullable();
@@ -23,6 +28,29 @@ return new class extends Migration
             $table->unique(['booking_id', 'rater_user_id', 'role']);
             $table->index('ratee_user_id');
             $table->index('rating');
+        });
+        
+        // Add foreign key constraints after table is created
+        Schema::table('ratings', function (Blueprint $table) {
+            $table->foreign('booking_id')
+                  ->references('id')
+                  ->on('bookings')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('ride_id')
+                  ->references('id')
+                  ->on('rides')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('rater_user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('cascade');
+                  
+            $table->foreign('ratee_user_id')
+                  ->references('id')
+                  ->on('users')
+                  ->onDelete('cascade');
         });
     }
 
